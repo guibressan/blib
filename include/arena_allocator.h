@@ -63,8 +63,8 @@ static void *arena_alloc(ArenaAllocator *a, size_t sz) {
 static void *arena_alloc_fn(Allocator *a, AllocatorOP op) {
 	ArenaAllocator *arena = (ArenaAllocator *)a->state;
 	switch (op.opcode) {
-	case ALLOC_NEW: {
-		size_t needed = op.data.size;
+	case ALLOC_ALLOC: {
+		size_t needed = op.data.alloc.size;
 		if (!a->state) {
 			ArenaAllocator *arena1 = 0;
 			if (arena_grow(&arena1, needed)) return 0;

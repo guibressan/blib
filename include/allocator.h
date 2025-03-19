@@ -17,23 +17,43 @@
 #endif
 
 typedef enum AllocatorOPCode {
-	ALLOC_NEW,
+	ALLOC_ALLOC,
 	ALLOC_FREE,
 	ALLOC_FREE_ALL,
 	ALLOC_REALLOC,
 } AllocatorOPCode;
 
+typedef struct AllocatorAlloc {
+	 size_t size;
+#ifdef DEBUG
+	 const char *file;
+	 int line;
+#endif
+} AllocatorAlloc;
+
+typedef struct AllocatorFree {
+	 void *ptr;
+#ifdef DEBUG
+	 const char *file;
+	 int line;
+#endif
+} AllocatorFree;
+
 typedef struct AllocatorRealloc {
 	 void *old;
 	 size_t oldsz;
 	 size_t newsz;
+#ifdef DEBUG
+	 const char *file;
+	 int line;
+#endif
 } AllocatorRealloc;
 
 typedef struct AllocatorOP {
 	 AllocatorOPCode opcode;
 	 union {
-		 size_t size;
-		 void *ptr;
+		 AllocatorAlloc alloc;
+		 AllocatorFree free;
 		 AllocatorRealloc realloc;
 	 } data;
 } AllocatorOP;
@@ -43,39 +63,111 @@ typedef struct Allocator {
 	void *(*alloc_fn)(struct Allocator *allocator, AllocatorOP op);
 } Allocator;
 
+
+#ifdef DEBUG
+
+#define alloc_new(a, s)\
+_alloc_new((a), (s), __FILE__, __LINE__)
+#define alloc_free(a, p) _alloc_free((a), (p), __FILE__, __LINE__)
+#define alloc_realloc(a, p, o, n)\
+_alloc_realloc((a),(p),(o),(n), __FILE__, __LINE__)
+
+void *_alloc_new(Allocator *a, size_t size, const char *file, int line);
+void _alloc_free(Allocator *a, void *ptr, const char *file, int line);
+void alloc_free_all(Allocator *a);
+void *_alloc_realloc(
+	Allocator *a,
+	void *ptr,
+	size_t oldsz,
+	size_t newsz,
+	const char *file,
+	int line
+);
+
+#else
+
 void *alloc_new(Allocator *a, size_t size);
 void alloc_free(Allocator *a, void *ptr);
 void alloc_free_all(Allocator *a);
 void *alloc_realloc(Allocator *a, void *ptr, size_t oldsz, size_t newsz);
 
-void *alloc_new(Allocator *a, size_t size) {
+#endif //DEBUG
+
+
+#ifdef DEBUG
+void *_alloc_new(Allocator *a, size_t size, const char *file, int line) {
 	AllocatorOP op;
-	op.opcode = ALLOC_NEW;
-	op.data.size = size;
+	op.opcode = ALLOC_ALLOC;
+	AllocatorAlloc data = { .size = size, .file = file, .line = line };
+	op.data.alloc = data;
 	return a->alloc_fn(a, op);
 }
 
-void alloc_free(Allocator *a, void *ptr) {
+void _alloc_free(Allocator *a, void *ptr, const char *file, int line) {
 	AllocatorOP op;
 	op.opcode = ALLOC_FREE;
-	op.data.ptr = ptr;
+	AllocatorFree data = { .ptr = ptr, .file = file, .line = line };
+	op.data.free = data;
 	a->alloc_fn(a, op);
 	return;
 }
 
 void alloc_free_all(Allocator *a) {
-	AllocatorOP op;
+	AllocatorOP op = {0};
+	op.opcode = ALLOC_FREE_ALL;
+	a->alloc_fn(a, op);
+	return;
+}
+
+void *_alloc_realloc(
+	Allocator *a,
+	void *old,
+	size_t oldsz,
+	size_t newsz,
+	const char *file,
+	int line
+) {
+	AllocatorOP op = {};
+	AllocatorRealloc data = {.old = old, .oldsz = oldsz, .newsz = newsz};
+	op.opcode = ALLOC_REALLOC;
+	op.data.realloc = data;
+	return a->alloc_fn(a, op);
+}
+
+#else
+
+void *alloc_new(Allocator *a, size_t size) {
+	AllocatorOP op = {0};
+	op.opcode = ALLOC_ALLOC;
+	AllocatorAlloc data = { .size = size };
+	op.data.alloc = data;
+	return a->alloc_fn(a, op);
+}
+
+void alloc_free(Allocator *a, void *ptr) {
+	AllocatorOP op = {0};
+	op.opcode = ALLOC_FREE;
+	AllocatorFree data = { .ptr = ptr };
+	op.data.free = data;
+	a->alloc_fn(a, op);
+	return;
+}
+
+void alloc_free_all(Allocator *a) {
+	AllocatorOP op = {0};
 	op.opcode = ALLOC_FREE_ALL;
 	a->alloc_fn(a, op);
 	return;
 }
 
 void *alloc_realloc(Allocator *a, void *old, size_t oldsz, size_t newsz) {
-	AllocatorOP op = {};
-	AllocatorRealloc r = {.old = old, .oldsz = oldsz, .newsz = newsz};
+	AllocatorOP op = {0};
+	AllocatorRealloc data = {.old = old, .oldsz = oldsz, .newsz = newsz};
 	op.opcode = ALLOC_REALLOC;
-	op.data.realloc = r;
+	op.data.realloc = data;
 	return a->alloc_fn(a, op);
 }
+
+#endif //DEBUG
 
 #endif // ALLOCATOR_H
