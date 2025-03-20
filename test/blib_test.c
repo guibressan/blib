@@ -2,8 +2,10 @@
 #include <assert.h> // assert
 
 #include "arena_allocator.h"
+#include "heap_allocator.h"
 #include "testing.h"
 #include "bytes.h"
+#include "slice.h"
 
 void test_arena() {
 	Allocator arena;
@@ -42,11 +44,29 @@ void test_arena() {
 	arena_destroy(&arena);
 }
 
-void test_heap() {
-
+void test_heap_allocator() {
+	Allocator ha = {0};
+	assert(!heap_allocator_init(&ha));
+	int *ptr = alloc_new(&ha, sizeof(int));
+	assert(ptr);
+	int *ptr2 = alloc_new(&ha, sizeof(int));
+	assert(ptr2);
+	int *ptr3 = alloc_new(&ha, sizeof(int));
+	assert(ptr3);
+	alloc_free(&ha, ptr2);
+	// oops, forgot to free some of the pointers
+	heap_allocator_print_stats(&ha);
+	// double free
+	alloc_free(&ha, ptr2);
+	heap_allocator_destroy(&ha);
 }
 
-#include "slice.h"
+static int char_cmp(void *ctx, void *item) {
+	if (*((char *)ctx) == *((char *)item)) {
+		return 1;
+	}
+	return 0;
+}
 
 void test_slice() {
 	Allocator a = {0};
@@ -80,13 +100,17 @@ void test_slice() {
 	size_t ptr = 0;
 	assert(!slice_get_ptr(&slice, 0, &ptr));
 	assert(bytes_eq((void *)ptr, (void *)"23", 2));
+	char cmp = '2';
+	size_t addr = 0;
+	assert(slice_find_ptr(&slice, &cmp, &char_cmp, &addr));
+	assert(cmp == *((char *)addr));
 	// in this case, destroy is not necessary, as arena allocator is being used
 	slice_destroy(&slice); 
 	arena_destroy(&a);
 }
 
 int main(void) {
-	test_arena();
-	test_heap();
+	test_heap_allocator();
 	test_slice();
+	test_arena();
 }
