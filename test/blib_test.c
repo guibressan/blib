@@ -3,7 +3,6 @@
 
 #include "arena_allocator.h"
 #include "testing.h"
-#include "slice.h"
 
 void test_arena() {
 	Allocator arena;
@@ -46,7 +45,11 @@ void test_heap() {
 
 }
 
-DEFINE_SLICE(char)
+//DEFINE_SLICE(char)
+
+#define TYPE char
+#include "slice.h"
+#undef TYPE
 
 void test_slice() {
 	Allocator a = {0};
