@@ -3,6 +3,7 @@
 
 #include "arena_allocator.h"
 #include "testing.h"
+#include "bytes.h"
 
 void test_arena() {
 	Allocator arena;
@@ -45,41 +46,42 @@ void test_heap() {
 
 }
 
-//DEFINE_SLICE(char)
-
-#define TYPE char
 #include "slice.h"
-#undef TYPE
 
 void test_slice() {
 	Allocator a = {0};
 	assert(!arena_init(&a));
-	slice_char slice = {0};
-	slice_char_init(&slice, &a);
+	Slice slice = {0};
+	slice_init(&slice, &a, sizeof(char));
 	for (int i = 0; i < 4; i++) {
-		assert(!slice_char_append(&slice, '1'));
+		assert(!slice_append(&slice, "1"));
 	}
-	assert(slice_char_len(&slice) == 4);
-	assert(slice_char_cap(&slice) == 4);
-	slice_char_reset(&slice);
-	assert(slice_char_len(&slice) == 0);
-	assert(slice_char_cap(&slice) == 4);
+	assert(slice_len(&slice) == 4);
+	assert(slice_cap(&slice) == 4);
+	slice_reset(&slice);
+	assert(slice_len(&slice) == 0);
+	assert(slice_cap(&slice) == 4);
 	char r = 0;
-	assert(!slice_char_append(&slice, '1'));
-	assert(!slice_char_set(&slice, 0, '2'));
-	assert(!slice_char_get(&slice, 0, &r));
+	assert(!slice_append(&slice, "1"));
+	assert(!slice_set(&slice, 0, "2"));
+	assert(!slice_get(&slice, 0, &r));
 	assert(r == '2');
-	slice_char_reset(&slice);
+	slice_reset(&slice);
 	for (int i = 0; i < 4; i++) {
-		assert(!slice_char_append(&slice, '1'+i));
+		char r = '1'+i;
+		assert(!slice_append(&slice, &r));
 	}
-	assert(!slice_char_uremove(&slice, 0));
-	assert(!slice_char_get(&slice, 0, &r));
+	assert(!slice_uremove(&slice, 0));
+	assert(!slice_get(&slice, 0, &r));
 	assert(r == '4');
-	assert(!slice_char_oremove(&slice, 0));
-	assert(!slice_char_get(&slice, 0, &r));
+	assert(!slice_oremove(&slice, 0));
+	assert(!slice_get(&slice, 0, &r));
 	assert(r == '2');
-	slice_char_destroy(&slice);
+	size_t ptr = 0;
+	assert(!slice_get_ptr(&slice, 0, &ptr));
+	assert(bytes_eq((void *)ptr, (void *)"23", 2));
+	// in this case, destroy is not necessary, as arena allocator is being used
+	slice_destroy(&slice); 
 	arena_destroy(&a);
 }
 
