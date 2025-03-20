@@ -86,3 +86,4 @@ void slice_##TYPE##_destroy(slice_##TYPE *s) { \
 } \
 
 #endif // SLICE_H
+

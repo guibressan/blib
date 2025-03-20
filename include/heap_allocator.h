@@ -21,25 +21,25 @@ typedef struct HeapAllocator {
 } HeapAllocator;
 
 void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
-//	HeapAllocator *h = a->state;
-//	switch (op.opcode) {
-//	case ALLOC_ALLOC:
-//		void *ptr = 0;
-//		ptr = malloc(op.data.alloc.size);
-//		if (!ptr) return 0;
-//		return ptr;
-//	case ALLOC_FREE:
-//		free(op.data.free.ptr);
-//		return 0;
-//	case ALLOC_FREE_ALL:
-//		return 0;
-//	case ALLOC_REALLOC:
-//		void *p = realloc(op.data.realloc.old);
-//		if (!p) return 0;
-//		return p;
-//	default:
-//		return 0;
-//	}
+	HeapAllocator *h = a->state;
+	void *p = 0;
+	switch (op.opcode) {
+	case ALLOC_ALLOC:
+		p = malloc(op.data.alloc.size);
+		if (!p) return 0;
+		return p;
+	case ALLOC_FREE:
+		free(op.data.free.ptr);
+		return 0;
+	case ALLOC_FREE_ALL:
+		return 0;
+	case ALLOC_REALLOC:
+		p = realloc(op.data.realloc.old, op.data.realloc.newsz);
+		if (!p) return 0;
+		return p;
+	default:
+		return 0;
+	}
 	return 0;
 }
 
