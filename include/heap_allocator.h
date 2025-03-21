@@ -26,7 +26,7 @@ static int heap_allocation_cmp_ptr(void *ctx, void *test) {
 	return (int)(((size_t)ctx) == (size_t)((HeapAllocation *)test)->ptr);
 }
 
-void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
+static void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
 	HeapAllocator *h = a->state;
 	void *p = 0;
 #ifdef DEBUG
@@ -108,7 +108,7 @@ void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
 	return 0;
 }
 
-int heap_allocator_init(Allocator *a) {
+static int heap_allocator_init(Allocator *a) {
 	HeapAllocator *h = malloc(sizeof(HeapAllocator));
 	if (!h) return 1;
 	memset(h, 0, sizeof(HeapAllocator));
@@ -122,7 +122,7 @@ int heap_allocator_init(Allocator *a) {
 	return 0;
 }
 
-void heap_allocator_destroy(Allocator *a) {
+static void heap_allocator_destroy(Allocator *a) {
 	if (!a->state || a->alloc_fn != &heap_alloc_fn) return;
 	HeapAllocator *h = a->state;
 #ifdef DEBUG
@@ -133,7 +133,7 @@ void heap_allocator_destroy(Allocator *a) {
 	*a = b;
 }
 
-void heap_allocator_print_stats(Allocator *a) {
+static void heap_allocator_print_stats(Allocator *a) {
 #ifdef DEBUG
 	if (!a->state || a->alloc_fn != &heap_alloc_fn) return;
 	HeapAllocator *h = a->state;

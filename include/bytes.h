@@ -1,7 +1,7 @@
 #ifndef BYTES_H
 #define BYTES_H
 
-int bytes_eq(unsigned char *a, unsigned char *b, size_t sz) {
+static int bytes_eq(unsigned char *a, unsigned char *b, size_t sz) {
 	if (!a && !b) return 1;
 	if (!a && b) return 0;
 	if (a && !b) return 0;

@@ -97,14 +97,14 @@ static void *arena_alloc_fn(Allocator *a, AllocatorOP op) {
 	}
 }
 
-int arena_init(Allocator *a) {
+static int arena_init(Allocator *a) {
 	Allocator alloc = {0};
 	alloc.alloc_fn = &arena_alloc_fn;
 	*a = alloc;
 	return 0;
 }
 
-int arena_destroy(Allocator *a) {
+static int arena_destroy(Allocator *a) {
 	if (!a->state) return 0;
 	ArenaAllocator *arena = (ArenaAllocator *)a->state;
 	int i = 0;
