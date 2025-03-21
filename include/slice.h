@@ -18,9 +18,7 @@ static void slice_init(Slice *s, Allocator *a, size_t item_size) {
 }
  
 static int slice_append(Slice *s, void *value) { 
-	if (!s->a || !s->isz) { 
-		return 1; 
-	} 
+	if (!s->a || !s->isz) return 1; 
 	if (s->cap > s->len) { 
 		memcpy(s->base+(s->len*s->isz), value, s->isz);
 		s->len++; 
@@ -39,6 +37,27 @@ static int slice_append(Slice *s, void *value) {
 	s->len++; 
 	return 0; 
 } 
+
+static int slice_append_multi(Slice *s, void *value, size_t count) {
+	if (!s->a || !s->isz) return 1; 
+	if (s->cap - s->len >= count) {
+		memcpy(s->base+(s->len*s->isz), value, count*s->isz);
+		s->len += count;
+		return 0;
+	} 
+	size_t new_cap = MAX(s->cap*2, count); 
+	char *p = 0;
+	if (!s->cap) p = alloc_new(s->a, s->isz*new_cap); 
+	else p = alloc_realloc( 
+		s->a, (void *)s->base, s->isz*s->cap, s->isz*new_cap 
+	); 
+	if (!p) return 1; 
+	s->base = p; 
+	s->cap = new_cap; 
+	memcpy(s->base+(s->len*s->isz), value, count*s->isz);
+	s->len += count;
+	return 0; 
+}
 
 static int slice_get(Slice *s, size_t index, void *dest) { 
 	if (s->len-1 < index) return 1;  
