@@ -56,21 +56,38 @@ static void _testing_expect(
 static void testing_run(TestRunner *tr) {
 	testing_t t = {0};
 	TestProcedure proc = {0};
+	Allocator heap = {0};
+	HeapAllocatorReport report = {0};
 	//
 	for (size_t i = 0; i < slice_len(&tr->test_procedures); i++) {
 		t = (testing_t){0};
-		t = (testing_t){.heap = &tr->heap, .arena = &tr->arena};
+		report = (HeapAllocatorReport){0};
+		assert(!heap_allocator_init(&heap, &tr->arena));
+		t = (testing_t){.heap = &heap, .arena = &tr->arena};
 		slice_get(&tr->test_procedures, i, &proc);
+		// run the test
 		proc(&t);
+		//
 		if (t.message) {
-			printf("test %lu failed: %s\n", i+1, t.message);
-			continue;
-		}
+			printf("test %lu FAIL: %s\n", i+1, t.message);
+			goto finalizer;
+		} 
 		if (t.failed) {
-			printf("test %lu failed\n", i+1);
-			continue;
+			printf("test %lu FAIL\n", i+1);
+			goto finalizer;
+		} 
+		if (heap_allocator_get_report(&heap, &report)) {
+			printf("test %lu PASS\n", i+1);
+			goto finalizer;
+		}
+		if (report.n_leaks) {
+			printf("test %lu PASS but has memory leaks\n", i+1);
+			heap_allocator_report_print(&report);
+			goto finalizer;
 		}
 		printf("test %lu PASS\n", i+1);
+finalizer:
+		alloc_free_all(&tr->arena);
 	}
 }
 

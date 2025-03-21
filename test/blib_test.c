@@ -10,8 +10,6 @@
 #include "slice.h"
 
 static void test_arena(testing_t *t) {
-	int ex = 0;
-	testing_expect(t, ex == 1);
 	Allocator malloc_a = {0};
 	testing_expect(t, !malloc_allocator_init(&malloc_a));
 	Allocator backing = {0};
@@ -144,6 +142,18 @@ static void test_slice(testing_t *t) {
 	heap_allocator_destroy(&a);
 }
 
+void test_leak_detection(testing_t *t) {
+	void *a, *b, *c, *d, *e;
+	testing_expect(t, (a = alloc_new(t->arena, 1)));
+	testing_expect(t, (b = alloc_new(t->arena, 2)));
+	testing_expect(t, (c = alloc_new(t->arena, 4)));
+	testing_expect(t, (d = alloc_new(t->heap, 4)));
+	testing_expect(t, (e = alloc_new(t->heap, 4)));
+	// comment the lines below to see a helpful message about the memleak
+	alloc_free(t->heap, d);
+	alloc_free(t->heap, e);
+}
+
 int main(void) {
 	TestRunner tr = {0};
 	testing_init(&tr);
@@ -151,6 +161,7 @@ int main(void) {
 	testing_add(&tr, &test_arena);
 	testing_add(&tr, &test_heap_allocator);
 	testing_add(&tr, &test_slice);
+	testing_add(&tr, &test_leak_detection);
 	//
 	testing_run(&tr);
 	return 0;
