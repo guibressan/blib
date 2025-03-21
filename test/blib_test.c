@@ -3,14 +3,17 @@
 
 #include "arena_allocator.h"
 #include "heap_allocator.h"
+#include "malloc_allocator.h"
 #include "testing.h"
 #include "bytes.h"
 #include "slice.h"
 
 void test_arena() {
-	Allocator arena;
+	Allocator backing = {0};
+	assert(!malloc_allocator_init(&backing));
+	Allocator arena = {0};
 	// arena init initializes the allocator with the arena function pointer
-	assert(!arena_init(&arena));
+	assert(!arena_init(&arena, &backing));
 	size_t sz = ((size_t)10)<<20;
 	// the first allocation determines the size of the first arena memory block
 	char *p = alloc_new(&arena, sz);
@@ -45,8 +48,10 @@ void test_arena() {
 }
 
 void test_heap_allocator() {
+	Allocator backing = {0};
+	assert(!malloc_allocator_init(&backing));
 	Allocator ha = {0};
-	assert(!heap_allocator_init(&ha));
+	assert(!heap_allocator_init(&ha, &backing));
 	int *ptr = alloc_new(&ha, sizeof(int));
 	assert(ptr);
 	int *ptr2 = alloc_new(&ha, sizeof(int));
@@ -55,9 +60,16 @@ void test_heap_allocator() {
 	assert(ptr3);
 	alloc_free(&ha, ptr2);
 	// oops, forgot to free some of the pointers
-	heap_allocator_print_stats(&ha);
-	// double free
-	alloc_free(&ha, ptr2);
+	HeapAllocatorReport r = {0};
+	assert(!heap_allocator_get_report(&ha, &r));
+	assert(r.alloc_bytes == 12);
+	assert(r.n_allocs == 3);
+	assert(r.leak_bytes == 8);
+	assert(r.n_leaks == 2);
+	// uncomment to print the heap allocator report
+	// heap_allocator_report_print(&r);
+	// uncomment the double free and the program will crash with a useful message
+	//alloc_free(&ha, ptr2);
 	heap_allocator_destroy(&ha);
 }
 
@@ -69,8 +81,10 @@ static int char_cmp(void *ctx, void *item) {
 }
 
 void test_slice() {
+	Allocator backing = {0};
+	assert(!malloc_allocator_init(&backing));
 	Allocator a = {0};
-	assert(!arena_init(&a));
+	assert(!arena_init(&a, &backing));
 	Slice slice = {0};
 	slice_init(&slice, &a, sizeof(char));
 	for (int i = 0; i < 4; i++) {
@@ -110,7 +124,7 @@ void test_slice() {
 }
 
 int main(void) {
+	test_arena();
 	test_heap_allocator();
 	test_slice();
-	test_arena();
 }
