@@ -8,31 +8,32 @@
 #include "bytes.h"
 #include "slice.h"
 
-void test_arena() {
+static void test_arena() {
+	Allocator malloc_a = {0};
+	assert(!malloc_allocator_init(&malloc_a));
 	Allocator backing = {0};
-	assert(!malloc_allocator_init(&backing));
+	assert(!heap_allocator_init(&backing, &malloc_a));
 	Allocator arena = {0};
-	// arena init initializes the allocator with the arena function pointer
 	assert(!arena_init(&arena, &backing));
 	size_t sz = ((size_t)10)<<20;
 	// the first allocation determines the size of the first arena memory block
 	char *p = alloc_new(&arena, sz);
 	assert(p);
 	memset(p, 0, sz);
-	assert(testing_byteslice_eq(p, sz, 0));
+	assert(bytes_is((void *)p, 0, sz));
 	// subsequent allocations will create new blocks if remaining block space is
 	// insufficient
 	char *p2 = alloc_new(&arena, sz);
 	memset(p2, 1, sz);
 	assert(p2);
-	assert(testing_byteslice_eq(p2, sz, 1));
+	assert(bytes_is((void *)p2, 1, sz));
 	// arena realloc will create a new allocation and copy the bytes from the
 	// old allocation
 	char *p3 = alloc_realloc(&arena, p2, sz, sz*2);
 	assert(p3);
 	memset(p3+sz, 2, sz);
-	assert(testing_byteslice_eq(p3, sz, 1));
-	assert(testing_byteslice_eq(p3+sz, sz, 2));
+	assert(bytes_is((void *)p3, 1, sz));
+	assert(bytes_is((void *)p3+sz, 2, sz));
 	// arena free all will free all blocks, with the exception of the first
 	// block, which will have the length set to 0, allowing deterministic reusage
 	// without syscalls
@@ -41,16 +42,31 @@ void test_arena() {
 	assert(p4 == p);
 	// note, we are not initializing the memory, since is known that this is the
 	// first arena memory block that was initialized before
-	assert(testing_byteslice_eq(p4, sz, 0));
+	assert(bytes_is((void *)p4, 0, sz));
 	// arena destroy will free all the arena resources, including the first
 	// memory block
 	arena_destroy(&arena);
+	// Proving that all the resources were released
+	HeapAllocatorReport r = {0};
+	assert(!heap_allocator_get_report(&backing, &r));
+	// using HeapAllocator as backing allocator for ArenaAllocator is useful
+	// because you can get the report to tune the arena
+	assert(r.n_leaks == 0);
+	heap_allocator_destroy(&backing);
+	malloc_allocator_destroy(&malloc_a);
 }
 
-void test_heap_allocator() {
+static void test_heap_allocator() {
 	Allocator backing = {0};
 	assert(!malloc_allocator_init(&backing));
 	Allocator ha = {0};
+	// for now, heap allocator is a wrapper over the backing allocator, in this
+	// case, malloc, the differece is that when 'DEBUG' is defined the program
+	// will crash when you double free or attempt to realloc with a unknown 
+	// pointer.
+	// 
+	// also, when 'DEBUG' is enabled, you can get reports about the allocations,
+	// turning possible to track memory leaks
 	assert(!heap_allocator_init(&ha, &backing));
 	int *ptr = alloc_new(&ha, sizeof(int));
 	assert(ptr);
@@ -71,6 +87,7 @@ void test_heap_allocator() {
 	// uncomment the double free and the program will crash with a useful message
 	//alloc_free(&ha, ptr2);
 	heap_allocator_destroy(&ha);
+	malloc_allocator_destroy(&backing);
 }
 
 static int char_cmp(void *ctx, void *item) {
@@ -80,11 +97,11 @@ static int char_cmp(void *ctx, void *item) {
 	return 0;
 }
 
-void test_slice() {
+static void test_slice() {
 	Allocator backing = {0};
 	assert(!malloc_allocator_init(&backing));
 	Allocator a = {0};
-	assert(!arena_init(&a, &backing));
+	assert(!heap_allocator_init(&a, &backing));
 	Slice slice = {0};
 	slice_init(&slice, &a, sizeof(char));
 	for (int i = 0; i < 4; i++) {
@@ -120,7 +137,10 @@ void test_slice() {
 	assert(cmp == *((char *)addr));
 	// in this case, destroy is not necessary, as arena allocator is being used
 	slice_destroy(&slice); 
-	arena_destroy(&a);
+	HeapAllocatorReport report= {0};
+	assert(!heap_allocator_get_report(&a, &report));
+	assert(report.n_leaks == 0);
+	heap_allocator_destroy(&a);
 }
 
 int main(void) {

@@ -23,4 +23,8 @@ static int malloc_allocator_init(Allocator *a) {
 	return 0;
 }
 
+static int malloc_allocator_destroy(Allocator *a) {
+	return 0;
+}
+
 #endif
