@@ -1,6 +1,7 @@
 #ifndef HEAP_ALLOCATOR_H
 #define HEAP_ALLOCATOR_H
 
+#include "assert.h"
 #include <stdlib.h> // malloc, free, realloc
 #include "slice.h"
 #include "arena_allocator.h"

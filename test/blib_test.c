@@ -1,5 +1,4 @@
-#include <unistd.h> // sleep
-#include <assert.h> // assert
+#define DEBUG
 
 #include "testing.h"
 #include "arena_allocator.h"

@@ -6,6 +6,7 @@
 #include "heap_allocator.h"
 #include "arena_allocator.h"
 #include "slice.h"
+#include "assert.h"
 
 typedef struct {
 	Allocator *heap;
