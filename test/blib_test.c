@@ -5,6 +5,7 @@
 #include "testing.h"
 #include "bytes.h"
 #include "slice.h"
+#include "error.h"
 
 static void test_arena(testing_t *t) {
 	Allocator arena = {0};
@@ -142,6 +143,38 @@ void test_leak_detection(testing_t *t) {
 	alloc_free(t->heap, e);
 }
 
+void test_errors(testing_t *t) {
+	Errors err = {0};
+	errors_init(&err, t->heap);
+	const char *msg = "const char error";
+	size_t count = snprintf(0, 0, "non const char error");
+	char *msg2 = 0;
+	testing_expect(t, (msg2 = alloc_new(t->arena, count+1)));
+	snprintf(msg2, count+1, "non const char error");
+	// append const messages to errors just saves the string pointer
+	testing_expect(t, !errors_append_const(&err, msg));
+	// append make a copy of the string
+	testing_expect(t, !errors_append(&err, msg2, count));
+	*(msg2+count-2) = '\0';
+	testing_expect(t, !errors_append(&err, msg2, count));
+	testing_expect(t, errors_len(&err) == 3);
+	// check if a specific error happened
+	testing_expect(t, errors_has(&err, msg));
+	// it does not work with non const strings, since we can not compare the 
+	// address
+	//
+	// but nothing prevents you to use const strings for matching and non-const
+	// strings for context
+	testing_expect(t, !errors_has(&err, msg2));
+	// print the errors
+	errors_print(&err);
+	// reset for reuse, the copies of non const strings will be freed
+	errors_reset(&err);
+	// testing_expect(t, errors_len(&err) == 0);
+	//errors_print(&err);
+	errors_destroy(&err);
+}
+
 int main(void) {
 	TestRunner tr = {0};
 	testing_init(&tr);
@@ -150,6 +183,7 @@ int main(void) {
 	testing_add(&tr, &test_heap_allocator);
 	testing_add(&tr, &test_slice);
 	testing_add(&tr, &test_leak_detection);
+	testing_add(&tr, &test_errors);
 	//
 	testing_run(&tr);
 	return 0;
