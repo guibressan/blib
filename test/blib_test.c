@@ -1,5 +1,3 @@
-#define DEBUG
-
 #include "testing.h"
 #include "arena_allocator.h"
 #include "heap_allocator.h"
@@ -62,18 +60,22 @@ static void test_heap_allocator(testing_t *t) {
 	testing_expect(t, ptr3);
 	alloc_free(&ha, ptr2);
 	// oops, forgot to free some of the pointers
+	// heap allocator just tracks allocations when 'DEBUG' is defined
+#ifdef DEBUG
 	HeapAllocatorReport r = {0};
 	testing_expect(t, !heap_allocator_get_report(&ha, &r));
 	testing_expect(t, r.alloc_bytes == 12);
 	testing_expect(t, r.n_allocs == 3);
 	testing_expect(t, r.leak_bytes == 8);
 	testing_expect(t, r.n_leaks == 2);
+#endif
 	alloc_free(&ha, ptr);
 	alloc_free(&ha, ptr3);
 	// uncomment to print the heap allocator report
 	// heap_allocator_report_print(&r);
-	// uncomment the double free and the program will crash with a useful message
-	//alloc_free(&ha, ptr2);
+	// uncomment the double free below and the program will crash with a useful
+	// message if 'DEBUG' is defined
+	// alloc_free(&ha, ptr2);
 	heap_allocator_destroy(&ha);
 }
 
@@ -120,9 +122,11 @@ static void test_slice(testing_t *t) {
 	testing_expect(t, cmp == *((char *)addr));
 	// in this case, destroy is not necessary, as arena allocator is being used
 	slice_destroy(&slice); 
+#ifdef DEBUG
 	HeapAllocatorReport report= {0};
 	testing_expect(t, !heap_allocator_get_report(&a, &report));
 	testing_expect(t, report.n_leaks == 0);
+#endif
 	heap_allocator_destroy(&a);
 }
 
