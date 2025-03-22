@@ -18,6 +18,11 @@ typedef struct {
 typedef void (*TestProcedure)(testing_t *t);
 
 typedef struct {
+	const char *name;
+	TestProcedure proc;
+} Test;
+
+typedef struct {
 	Allocator malloc;
 	Allocator heap;
 	Allocator arena;
@@ -32,19 +37,25 @@ static void testing_init(TestRunner *tr) {
 		!heap_allocator_init(&tr->heap, &tr->malloc) &&
 		!arena_init(&tr->arena, &tr->malloc)
 	);
-	slice_init(&tr->test_procedures, &tr->heap, sizeof(TestProcedure));
+	slice_init(&tr->test_procedures, &tr->heap, sizeof(Test));
 }
 
-static void testing_add(TestRunner *tr, TestProcedure t) {
-	assert(!slice_append(&tr->test_procedures, &t));
+#define testing_add(tr, t) _testing_add((tr), &(t), #t)
+
+static void _testing_add(TestRunner *tr, TestProcedure t, const char *name) {
+	Test test = {0};
+	test.name = name;
+	test.proc = t;
+	assert(!slice_append(&tr->test_procedures, &test));
 }
 
-#define testing_expect(t, b) _testing_expect((t), (b) != 0, __FILE__, __LINE__)
+#define testing_expect(t, b) \
+if (!_testing_expect((t), (b) != 0, __FILE__, __LINE__)) return;
 
-static void _testing_expect(
+static int _testing_expect(
 	testing_t *t, int test, const char *file, int line
 ) {
-	if (test) return;
+	if (test) return 1;
 	size_t len = 0;
 	char *ptr = 0;
 	//
@@ -52,11 +63,12 @@ static void _testing_expect(
 	assert((ptr = alloc_new(t->arena, len+1)));
 	snprintf(ptr, len+1, "%s:%d assertion failed", file, line);
 	t->message = ptr;
+	return 0;
 }
 
 static void testing_run(TestRunner *tr) {
 	testing_t t = {0};
-	TestProcedure proc = {0};
+	Test test = {0};
 	Allocator heap = {0};
 #ifdef BLIB_DEBUG
 	HeapAllocatorReport report = {0};
@@ -69,30 +81,27 @@ static void testing_run(TestRunner *tr) {
 #endif
 		assert(!heap_allocator_init(&heap, &tr->arena));
 		t = (testing_t){.heap = &heap, .arena = &tr->arena};
-		slice_get(&tr->test_procedures, i, &proc);
+		slice_get(&tr->test_procedures, i, &test);
 		// run the test
-		proc(&t);
+		test.proc(&t);
 		//
 		if (t.message) {
-			printf("test %lu FAIL: %s\n", i+1, t.message);
+			printf("%s FAIL: %s\n", test.name, t.message);
 			goto finalizer;
 		} 
 		if (t.failed) {
-			printf("test %lu FAIL\n", i+1);
+			printf("%s FAIL\n", test.name);
 			goto finalizer;
 		} 
 #ifdef BLIB_DEBUG
-		if (heap_allocator_get_report(&heap, &report)) {
-			printf("test %lu PASS\n", i+1);
-			goto finalizer;
-		}
+		assert(!heap_allocator_get_report(&heap, &report));
 		if (report.n_leaks) {
-			printf("test %lu PASS but has memory leaks\n", i+1);
+			printf("%s PASS but has memory leaks\n", test.name);
 			heap_allocator_report_print(&report);
 			goto finalizer;
 		}
 #endif
-		printf("test %lu PASS\n", i+1);
+		printf("%s PASS\n", test.name);
 finalizer:
 		alloc_free_all(&tr->arena);
 	}

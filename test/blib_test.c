@@ -167,7 +167,7 @@ void test_errors(testing_t *t) {
 	// strings for context
 	testing_expect(t, !errors_has(&err, msg2));
 	// print the errors
-	errors_print(&err);
+	//errors_print(&err);
 	// reset for reuse, the copies of non const strings will be freed
 	errors_reset(&err);
 	// testing_expect(t, errors_len(&err) == 0);
@@ -175,15 +175,16 @@ void test_errors(testing_t *t) {
 	errors_destroy(&err);
 }
 
+
 int main(void) {
 	TestRunner tr = {0};
 	testing_init(&tr);
 	//
-	testing_add(&tr, &test_arena);
-	testing_add(&tr, &test_heap_allocator);
-	testing_add(&tr, &test_slice);
-	testing_add(&tr, &test_leak_detection);
-	testing_add(&tr, &test_errors);
+	testing_add(&tr, test_arena);
+	testing_add(&tr, test_heap_allocator);
+	testing_add(&tr, test_slice);
+	testing_add(&tr, test_leak_detection);
+	testing_add(&tr, test_errors);
 	//
 	testing_run(&tr);
 	return 0;
