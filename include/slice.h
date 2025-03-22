@@ -27,9 +27,7 @@ static int slice_append(Slice *s, void *value) {
 	size_t new_cap = MAX(s->cap*2, 1); 
 	char *p = 0; 
 	if (!s->cap) p = alloc_new(s->a, s->isz*new_cap); 
-	else p = alloc_realloc( 
-		s->a, (void *)s->base, s->isz*s->cap, s->isz*new_cap 
-	); 
+	else p = alloc_realloc(s->a, (void *)s->base, s->isz*s->cap, s->isz*new_cap);
 	if (!p) return 1; 
 	s->base = p; 
 	s->cap = new_cap; 

@@ -9,12 +9,8 @@
 #include "slice.h"
 
 static void test_arena(testing_t *t) {
-	Allocator malloc_a = {0};
-	testing_expect(t, !malloc_allocator_init(&malloc_a));
-	Allocator backing = {0};
-	testing_expect(t, !heap_allocator_init(&backing, &malloc_a));
 	Allocator arena = {0};
-	testing_expect(t, !arena_init(&arena, &backing));
+	testing_expect(t, !arena_init(&arena, t->heap));
 	size_t sz = ((size_t)10)<<20;
 	// the first allocation determines the size of the first arena memory block
 	char *p = alloc_new(&arena, sz);
@@ -46,19 +42,9 @@ static void test_arena(testing_t *t) {
 	// arena destroy will free all the arena resources, including the first
 	// memory block
 	arena_destroy(&arena);
-	// Proving that all the resources were released
-	HeapAllocatorReport r = {0};
-	testing_expect(t, !heap_allocator_get_report(&backing, &r));
-	// using HeapAllocator as backing allocator for ArenaAllocator is useful
-	// because you can get the report to tune the arena
-	testing_expect(t, r.n_leaks == 0);
-	heap_allocator_destroy(&backing);
-	malloc_allocator_destroy(&malloc_a);
 }
 
 static void test_heap_allocator(testing_t *t) {
-	Allocator backing = {0};
-	testing_expect(t, !malloc_allocator_init(&backing));
 	Allocator ha = {0};
 	// for now, heap allocator is a wrapper over the backing allocator, in this
 	// case, malloc, the differece is that when 'DEBUG' is defined the program
@@ -67,7 +53,7 @@ static void test_heap_allocator(testing_t *t) {
 	// 
 	// also, when 'DEBUG' is enabled, you can get reports about the allocations,
 	// turning possible to track memory leaks
-	testing_expect(t, !heap_allocator_init(&ha, &backing));
+	testing_expect(t, !heap_allocator_init(&ha, t->heap));
 	int *ptr = alloc_new(&ha, sizeof(int));
 	testing_expect(t, ptr);
 	int *ptr2 = alloc_new(&ha, sizeof(int));
@@ -82,12 +68,13 @@ static void test_heap_allocator(testing_t *t) {
 	testing_expect(t, r.n_allocs == 3);
 	testing_expect(t, r.leak_bytes == 8);
 	testing_expect(t, r.n_leaks == 2);
+	alloc_free(&ha, ptr);
+	alloc_free(&ha, ptr3);
 	// uncomment to print the heap allocator report
 	// heap_allocator_report_print(&r);
 	// uncomment the double free and the program will crash with a useful message
 	//alloc_free(&ha, ptr2);
 	heap_allocator_destroy(&ha);
-	malloc_allocator_destroy(&backing);
 }
 
 static int char_cmp(void *ctx, void *item) {
@@ -98,10 +85,8 @@ static int char_cmp(void *ctx, void *item) {
 }
 
 static void test_slice(testing_t *t) {
-	Allocator backing = {0};
-	testing_expect(t, !malloc_allocator_init(&backing));
 	Allocator a = {0};
-	testing_expect(t, !heap_allocator_init(&a, &backing));
+	testing_expect(t, !heap_allocator_init(&a, t->heap));
 	Slice slice = {0};
 	slice_init(&slice, &a, sizeof(char));
 	for (int i = 0; i < 4; i++) {
