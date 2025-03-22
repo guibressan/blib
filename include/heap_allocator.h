@@ -152,6 +152,7 @@ static void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
 #ifdef DEBUG
 		h->n_allocs++;
 		h->alloc_tot += (op.data.realloc.newsz-haptr->size);
+		haptr->ptr = p;
 		haptr->size = op.data.realloc.newsz;
 #endif
 		return p;
@@ -181,7 +182,7 @@ static void heap_allocator_destroy(Allocator *a) {
 #ifdef DEBUG
 	arena_destroy(&h->arena);
 #endif
-	free(a->state);
+	alloc_free(h->backing, a->state);
 	Allocator b = {0};
 	*a = b;
 }
