@@ -1,4 +1,4 @@
-# BLIB
+# BLIB - Make Programming Great Again
 ---
 
 ## Components
