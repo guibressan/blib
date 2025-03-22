@@ -25,7 +25,7 @@ typedef struct {
 
 typedef struct HeapAllocator {
 	Allocator *backing;
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 	size_t alloc_tot;
 	size_t n_allocs;
 	Allocator arena;
@@ -40,13 +40,13 @@ static int heap_allocation_cmp_ptr(void *ctx, void *test) {
 static void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
 	HeapAllocator *h = a->state;
 	void *p = 0;
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 	HeapAllocation ha = {0};
 	HeapAllocation *haptr = 0;
 #endif
 	switch (op.opcode) {
 	case ALLOC_ALLOC:
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 		p = _alloc_new(
 			h->backing, op.data.alloc.size, op.data.alloc.file, op.data.alloc.line
 		);
@@ -54,7 +54,7 @@ static void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
 		p = alloc_new(h->backing, op.data.alloc.size);
 #endif
 		if (!p) return 0;
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 		h->alloc_tot += op.data.alloc.size;
 		h->n_allocs++;
 		ha = (HeapAllocation){
@@ -78,7 +78,7 @@ static void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
 #endif
 		return p;
 	case ALLOC_FREE:
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 		if (
 			!slice_find_ptr(
 				&h->allocs,
@@ -109,21 +109,21 @@ static void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
 			assert(0);
 		}
 #endif
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 		_alloc_free(
 			h->backing, op.data.free.ptr, op.data.free.file, op.data.free.line
 		);
 #else
 		alloc_free(h->backing, op.data.free.ptr);
 #endif
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 		haptr->freed = 1;
 #endif
 		return 0;
 	case ALLOC_FREE_ALL:
 		return 0;
 	case ALLOC_REALLOC:
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 		if (
 			!slice_find_ptr(
 				&h->allocs,
@@ -154,7 +154,7 @@ static void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
 			assert(0);
 		}
 #endif
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 		p = _alloc_realloc(
 			h->backing,
 			op.data.realloc.old,
@@ -172,7 +172,7 @@ static void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
 		);
 #endif
 		if (!p) return 0;
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 		h->n_allocs++;
 		h->alloc_tot += (op.data.realloc.newsz-haptr->size);
 		haptr->ptr = p;
@@ -189,7 +189,7 @@ static int heap_allocator_init(Allocator *a, Allocator *backing) {
 	if (!(h = alloc_new(backing, sizeof(HeapAllocator)))) return 1;
 	*h = (HeapAllocator){0};
 	h->backing = backing;
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 	assert(!arena_init(&h->arena, backing));
 	Slice s = {0};
 	slice_init(&s, &h->arena, sizeof(HeapAllocation));
@@ -202,7 +202,7 @@ static int heap_allocator_init(Allocator *a, Allocator *backing) {
 static void heap_allocator_destroy(Allocator *a) {
 	if (!a->state || a->alloc_fn != &heap_alloc_fn) return;
 	HeapAllocator *h = a->state;
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 	arena_destroy(&h->arena);
 #endif
 	alloc_free(h->backing, a->state);
@@ -211,7 +211,7 @@ static void heap_allocator_destroy(Allocator *a) {
 }
 
 static int heap_allocator_get_report(Allocator *a, HeapAllocatorReport *r) {
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 	*r = (HeapAllocatorReport){0};
 	HeapAllocator *h = a->state;
 	HeapAllocation ha = {0};

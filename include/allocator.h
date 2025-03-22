@@ -25,7 +25,7 @@ typedef enum AllocatorOPCode {
 
 typedef struct AllocatorAlloc {
 	 size_t size;
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 	 const char *file;
 	 int line;
 #endif
@@ -33,7 +33,7 @@ typedef struct AllocatorAlloc {
 
 typedef struct AllocatorFree {
 	 void *ptr;
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 	 const char *file;
 	 int line;
 #endif
@@ -43,7 +43,7 @@ typedef struct AllocatorRealloc {
 	 void *old;
 	 size_t oldsz;
 	 size_t newsz;
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 	 const char *file;
 	 int line;
 #endif
@@ -64,7 +64,7 @@ typedef struct Allocator {
 } Allocator;
 
 
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 
 #define alloc_new(a, s)\
 _alloc_new((a), (s), __FILE__, __LINE__)
@@ -91,10 +91,10 @@ static void alloc_free(Allocator *a, void *ptr);
 static void alloc_free_all(Allocator *a);
 static void *alloc_realloc(Allocator *a, void *ptr, size_t oldsz, size_t newsz);
 
-#endif //DEBUG
+#endif //BLIB_DEBUG
 
 
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 static void *_alloc_new(Allocator *a, size_t size, const char *file, int line) {
 	AllocatorOP op;
 	op.opcode = ALLOC_ALLOC;
@@ -168,6 +168,6 @@ static void *alloc_realloc(Allocator *a, void *old, size_t oldsz, size_t newsz) 
 	return a->alloc_fn(a, op);
 }
 
-#endif //DEBUG
+#endif //BLIB_DEBUG
 
 #endif // ALLOCATOR_H

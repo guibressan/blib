@@ -45,11 +45,11 @@ static void test_arena(testing_t *t) {
 static void test_heap_allocator(testing_t *t) {
 	Allocator ha = {0};
 	// for now, heap allocator is a wrapper over the backing allocator, in this
-	// case, malloc, the differece is that when 'DEBUG' is defined the program
+	// case, malloc, the differece is that when 'BLIB_DEBUG' is defined the program
 	// will crash when you double free or attempt to realloc with a unknown 
 	// pointer.
 	// 
-	// also, when 'DEBUG' is enabled, you can get reports about the allocations,
+	// also, when 'BLIB_DEBUG' is enabled, you can get reports about the allocations,
 	// turning possible to track memory leaks
 	testing_expect(t, !heap_allocator_init(&ha, t->heap));
 	int *ptr = alloc_new(&ha, sizeof(int));
@@ -60,8 +60,8 @@ static void test_heap_allocator(testing_t *t) {
 	testing_expect(t, ptr3);
 	alloc_free(&ha, ptr2);
 	// oops, forgot to free some of the pointers
-	// heap allocator just tracks allocations when 'DEBUG' is defined
-#ifdef DEBUG
+	// heap allocator just tracks allocations when 'BLIB_DEBUG' is defined
+#ifdef BLIB_DEBUG
 	HeapAllocatorReport r = {0};
 	testing_expect(t, !heap_allocator_get_report(&ha, &r));
 	testing_expect(t, r.alloc_bytes == 12);
@@ -74,7 +74,7 @@ static void test_heap_allocator(testing_t *t) {
 	// uncomment to print the heap allocator report
 	// heap_allocator_report_print(&r);
 	// uncomment the double free below and the program will crash with a useful
-	// message if 'DEBUG' is defined
+	// message if 'BLIB_DEBUG' is defined
 	// alloc_free(&ha, ptr2);
 	heap_allocator_destroy(&ha);
 }
@@ -122,7 +122,7 @@ static void test_slice(testing_t *t) {
 	testing_expect(t, cmp == *((char *)addr));
 	// in this case, destroy is not necessary, as arena allocator is being used
 	slice_destroy(&slice); 
-#ifdef DEBUG
+#ifdef BLIB_DEBUG
 	HeapAllocatorReport report= {0};
 	testing_expect(t, !heap_allocator_get_report(&a, &report));
 	testing_expect(t, report.n_leaks == 0);
