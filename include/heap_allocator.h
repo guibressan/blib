@@ -46,7 +46,13 @@ static void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
 #endif
 	switch (op.opcode) {
 	case ALLOC_ALLOC:
+#ifdef DEBUG
+		p = _alloc_new(
+			h->backing, op.data.alloc.size, op.data.alloc.file, op.data.alloc.line
+		);
+#else
 		p = alloc_new(h->backing, op.data.alloc.size);
+#endif
 		if (!p) return 0;
 #ifdef DEBUG
 		h->alloc_tot += op.data.alloc.size;
@@ -103,7 +109,13 @@ static void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
 			assert(0);
 		}
 #endif
+#ifdef DEBUG
+		_alloc_free(
+			h->backing, op.data.free.ptr, op.data.free.file, op.data.free.line
+		);
+#else
 		alloc_free(h->backing, op.data.free.ptr);
+#endif
 #ifdef DEBUG
 		haptr->freed = 1;
 #endif
@@ -142,12 +154,23 @@ static void *heap_alloc_fn(Allocator *a, AllocatorOP op) {
 			assert(0);
 		}
 #endif
+#ifdef DEBUG
+		p = _alloc_realloc(
+			h->backing,
+			op.data.realloc.old,
+			op.data.realloc.oldsz,
+			op.data.realloc.newsz,
+			op.data.realloc.file,
+			op.data.realloc.line
+		);
+#else
 		p = alloc_realloc(
 			h->backing,
 			op.data.realloc.old,
 			op.data.realloc.oldsz,
 			op.data.realloc.newsz
 		);
+#endif
 		if (!p) return 0;
 #ifdef DEBUG
 		h->n_allocs++;
