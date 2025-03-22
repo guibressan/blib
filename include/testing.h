@@ -58,11 +58,15 @@ static void testing_run(TestRunner *tr) {
 	testing_t t = {0};
 	TestProcedure proc = {0};
 	Allocator heap = {0};
+#ifdef BLIB_DEBUG
 	HeapAllocatorReport report = {0};
+#endif
 	//
 	for (size_t i = 0; i < slice_len(&tr->test_procedures); i++) {
 		t = (testing_t){0};
+#ifdef BLIB_DEBUG
 		report = (HeapAllocatorReport){0};
+#endif
 		assert(!heap_allocator_init(&heap, &tr->arena));
 		t = (testing_t){.heap = &heap, .arena = &tr->arena};
 		slice_get(&tr->test_procedures, i, &proc);
@@ -77,6 +81,7 @@ static void testing_run(TestRunner *tr) {
 			printf("test %lu FAIL\n", i+1);
 			goto finalizer;
 		} 
+#ifdef BLIB_DEBUG
 		if (heap_allocator_get_report(&heap, &report)) {
 			printf("test %lu PASS\n", i+1);
 			goto finalizer;
@@ -86,6 +91,7 @@ static void testing_run(TestRunner *tr) {
 			heap_allocator_report_print(&report);
 			goto finalizer;
 		}
+#endif
 		printf("test %lu PASS\n", i+1);
 finalizer:
 		alloc_free_all(&tr->arena);
