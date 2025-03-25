@@ -6,6 +6,7 @@
 #include "bytes.h"
 #include "slice.h"
 #include "error.h"
+#include "io.h"
 
 static void test_arena(testing_t *t) {
 	Allocator arena = {0};
@@ -121,7 +122,30 @@ static void test_slice(testing_t *t) {
 	size_t addr = 0;
 	testing_expect(t, slice_find_ptr(&slice, &cmp, &char_cmp, &addr));
 	testing_expect(t, cmp == *((char *)addr));
-	// in this case, destroy is not necessary, as arena allocator is being used
+	slice_grow_len_at(&slice, 4);
+	testing_expect(t, !slice_set_multi(&slice, 0, (void *)"FFFF", 4));
+	testing_expect(t, !slice_get_ptr(&slice, 0, &ptr));
+	testing_expect(t, bytes_eq((void *)"FFFF", (void *)ptr, 4));
+	testing_expect(t, !slice_set_len(&slice, 0));
+	testing_expect(t, 0 == slice_len(&slice));
+	size_t cap = slice_cap(&slice);
+	testing_expect(t, !slice_grow_cap_at(&slice, cap+1));
+	testing_expect(t, cap*2 == slice_cap(&slice));
+	Slice reslice = {0};
+	testing_expect(t, !slice_reslice(&slice, &reslice, 0, 0));
+	// note that there's no leak
+	// the reslice does not own the underlying bytes until it needs to grow
+	for (size_t i = 0; i < slice_cap(&reslice); i++) {
+		testing_expect(t, !slice_append(&reslice, (void *)"F"));
+	}
+	Slice reslice2 = {0};
+	testing_expect(t, !slice_reslice(&slice, &reslice2, 0, 0));
+	// in this case, we must destroy the reslice, since we are forcing it to grow
+	for (size_t i = slice_cap(&reslice2)+1; i > 0 ; i--) {
+		testing_expect(t, !slice_append(&reslice2, (void *)"F"));
+	}
+	// uncomment the line below and the test will fail due to the memory leak 
+	slice_destroy(&reslice2);
 	slice_destroy(&slice); 
 #ifdef BLIB_DEBUG
 	HeapAllocatorReport report= {0};
@@ -175,6 +199,70 @@ void test_errors(testing_t *t) {
 	errors_destroy(&err);
 }
 
+void test_buffer(testing_t *t) {
+	const char *str = "AAAAAAAAAABBBBBBBBBB";
+	size_t slen = strlen(str);
+	Slice s = {0}, s1 = {0};
+	slice_init(&s, t->heap, sizeof(char));
+	slice_init(&s1, t->heap, sizeof(char));
+	Buffer buf = {0};
+	testing_expect(t, !buffer_init(&buf, t->heap, sizeof(char)));
+	Writer w = {0};
+	Reader r = {0};
+	slice_append_multi(&s, (void *)str, slen);
+	// writing to the buffer will grow it as needed
+	testing_expect(t, slen == writer_write(buffer_as_writer(&buf, &w), &s));
+	void *p = 0;
+	slice_append_multi(&s1, (void *)"0000000000", slen/2);
+	slice_get_ptr(&s1, 0, (size_t *)&p);
+	testing_expect(t, slen/2 == reader_read(buffer_as_reader(&buf, &r), &s1))
+	testing_expect(t, bytes_eq((void *)str, p, slen/2));
+	// reader can do partial reads, but it does not grow the output slice, this
+	// way you can use the reader in a loop without doing memory allocations
+	testing_expect(t, slen/2 == reader_read(buffer_as_reader(&buf, &r), &s1))
+	testing_expect(t, bytes_eq((void *)(str+slen/2), p, slen/2));
+	// when there's no bytes remaining in the buffer, reader_read returns 0
+	testing_expect(t, 0 == reader_read(buffer_as_reader(&buf, &r), &s1));
+	slice_destroy(&s);
+	slice_destroy(&s1);
+	buffer_destroy(&buf);
+}
+
+void test_buffer_write_to_read_from(testing_t *t) {
+	Writer w = {0};
+	Reader r = {0};
+	size_t plen = ((size_t)10) << 20;
+	Slice payload = {0};
+	slice_init(&payload, t->heap, sizeof(char));
+	slice_grow_len_at(&payload, plen);
+	void *p = 0;
+	slice_get_ptr(&payload, 0, (size_t *)&p);
+	memset(p, 'F', plen);
+	Buffer buf = {0};
+	buffer_init(&buf, t->heap, sizeof(char));
+	testing_expect(t, plen == buffer_write(&buf, &payload));
+	Buffer buf2 = {0};
+	buffer_init(&buf2, t->heap, sizeof(char));
+	// you can write all the buffer bytes to any writer
+	testing_expect(t, plen == buffer_write_to(&buf, buffer_as_writer(&buf2, &w)));
+	slice_get_ptr(&buf2.slice, 0, (size_t *)&p);
+	for (size_t i = 0; i < plen; i++) testing_expect(t, 'F' == *((char*)(p+i)));
+	Buffer buf3 = {0};
+	buffer_init(&buf3, t->heap, sizeof(char));
+	int64_t n = 0;
+	// you can read from any reader until EOF
+	n = buffer_read_from(&buf3, buffer_as_reader(&buf2, &r));
+	testing_expect(t, plen == n);
+	Slice tmp = {0};
+	buffer_get_slice(&buf3, &tmp);
+	testing_expect(t, plen == slice_len(&tmp));
+	slice_get_ptr(&tmp, 0, (size_t *)&p);
+	for (size_t i = 0; i < plen; i++) testing_expect(t, 'F' == *((char*)(p+i)));
+	buffer_destroy(&buf3);
+	buffer_destroy(&buf2);
+	buffer_destroy(&buf);
+	slice_destroy(&payload);
+}
 
 int main(void) {
 	TestRunner tr = {0};
@@ -185,6 +273,8 @@ int main(void) {
 	testing_add(&tr, test_slice);
 	testing_add(&tr, test_leak_detection);
 	testing_add(&tr, test_errors);
+	testing_add(&tr, test_buffer);
+	testing_add(&tr, test_buffer_write_to_read_from);
 	//
 	testing_run(&tr);
 	return 0;
