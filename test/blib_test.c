@@ -7,6 +7,7 @@
 #include "slice.h"
 #include "error.h"
 #include "io.h"
+#include "fmt.h"
 
 static void test_arena(testing_t *t) {
 	Allocator arena = {0};
@@ -264,6 +265,19 @@ void test_buffer_write_to_read_from(testing_t *t) {
 	slice_destroy(&payload);
 }
 
+void test_fmt_asprintf(testing_t *t) {
+	char *str = 0;
+	testing_expect(
+		t,
+		fmt_asprintf(
+			t->heap, &str, "This will be allocated in the %s\n", "heap_allocator"
+		)
+	);
+	// uncomment to print the message
+	//printf("%s", str);
+	alloc_free(t->heap, str);
+}
+
 int main(void) {
 	TestRunner tr = {0};
 	testing_init(&tr);
@@ -275,6 +289,7 @@ int main(void) {
 	testing_add(&tr, test_errors);
 	testing_add(&tr, test_buffer);
 	testing_add(&tr, test_buffer_write_to_read_from);
+	testing_add(&tr, test_fmt_asprintf);
 	//
 	testing_run(&tr);
 	return 0;
