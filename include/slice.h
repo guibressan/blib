@@ -144,6 +144,25 @@ static int slice_oremove(Slice *s, size_t index) {
 	return 0; 
 } 
 
+static int slice_peek(Slice *s, void *dest) {
+	if (!s->len) {
+		memset(dest, 0, s->isz);
+		return -1;
+	}
+	memcpy(dest, s->base+((s->len-1)*s->isz), s->isz);
+	return 0;
+}
+
+static int slice_pop(Slice *s, void *dest) {
+	if (!s->len) {
+		memset(dest, 0, s->isz);
+		return -1;
+	}
+	memcpy(dest, s->base+((s->len-1)*s->isz), s->isz);
+	s->len--;
+	return 0;
+}
+
 static size_t slice_len(Slice *s) { 
 	return s->base ? s->len: 0; 
 } 

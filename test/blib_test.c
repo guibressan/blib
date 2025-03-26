@@ -147,6 +147,18 @@ static void test_slice(testing_t *t) {
 	}
 	// uncomment the line below and the test will fail due to the memory leak 
 	slice_destroy(&reslice2);
+	slice_reset(&slice);
+	// stack operations
+	testing_expect(t, !slice_append_multi(&slice, (void *)"AB", 2));
+	char v = 0;
+	testing_expect(t, !slice_peek(&slice, &v));
+	testing_expect(t, v == 'B');
+	testing_expect(t, !slice_pop(&slice, &v));
+	testing_expect(t, v == 'B');
+	testing_expect(t, !slice_pop(&slice, &v));
+	testing_expect(t, v == 'A');
+	testing_expect(t, slice_pop(&slice, &v));
+	testing_expect(t, v == 0);
 	slice_destroy(&slice); 
 #ifdef BLIB_DEBUG
 	HeapAllocatorReport report= {0};
