@@ -1,110 +1,111 @@
 #ifndef TESTING_H
 #define TESTING_H
 
-#include "allocator.h"
-#include "malloc_allocator.h"
-#include "heap_allocator.h"
-#include "arena_allocator.h"
-#include "slice.h"
-#include "assert.h"
+/****************************************/
+#include "util.h"
+#include "arena.h"
 
-typedef struct {
-	Allocator *heap;
-	Allocator *arena;
-	int failed;
-	char *message;
-} testing_t ;
+/******************************************************************************/
+/*				Test Runner				      */
+/******************************************************************************/
+/*			A simple way to run tests			      */
+/******************************************************************************/
 
-typedef void (*TestProcedure)(testing_t *t);
+/****************************************/
+struct testing_t {
+	struct arena *arena;
+};
 
-typedef struct {
-	const char *name;
-	TestProcedure proc;
-} Test;
+/****************************************/
+typedef void (*test_func)(struct testing_t *t);
 
-typedef struct {
-	Allocator malloc;
-	Allocator heap;
-	Allocator arena;
-	Slice test_procedures;
-} TestRunner;
+/****************************************/
+struct test {
+	const i8* tname;
+	test_func tf;
+};
 
-static void testing_init(TestRunner *tr) {
-	*tr = (TestRunner){0};
-	//
-	assert(
-		!malloc_allocator_init(&tr->malloc) &&
-		!heap_allocator_init(&tr->heap, &tr->malloc) &&
-		!arena_init(&tr->arena, &tr->malloc)
-	);
-	slice_init(&tr->test_procedures, &tr->heap, sizeof(Test));
+/****************************************/
+struct test_runner {
+	struct test *tests;
+	usize t_cap;
+	usize t_len;
+	struct arena *arena;
+};
+
+/****************************************/
+static void test_runner_init(struct test_runner *tr, struct arena *a)
+{
+	blib_memset(tr, 0, sizeof(*tr));
+	tr->arena = a;
 }
 
-#define testing_add(tr, t) _testing_add((tr), &(t), #t)
+/****************************************/
+#define test_runner_add(TR, TN) _test_runner_add((TR), #TN, &(TN))
 
-static void _testing_add(TestRunner *tr, TestProcedure t, const char *name) {
-	Test test = {0};
-	test.name = name;
-	test.proc = t;
-	assert(!slice_append(&tr->test_procedures, &test));
+static void _test_runner_add(
+	struct test_runner *tr, const i8* tname, test_func tf
+)
+{
+	void *ptr;
+	usize cap;
+
+	if (tr->t_cap - tr->t_len == 0) {
+		cap = MAX(tr->t_cap * 2, 100);
+		if (!tr->tests)
+			ptr = arena_alloc(tr->arena, cap * sizeof(*tr->tests));
+		else
+			ptr = arena_realloc(
+				tr->arena, tr->tests, cap * sizeof(*tr->tests)
+			);
+		ASSERTM(ptr, "FAIL TO REALLOC tests array");
+		tr->t_cap = cap;
+		tr->tests = ptr;
+	}
+	blib_memset(tr->tests+tr->t_len, 0, sizeof(*tr->tests));
+	(tr->tests+tr->t_len)->tname = tname;
+	(tr->tests+tr->t_len)->tf = tf;
+	tr->t_len++;
 }
 
-#define testing_expect(t, b) \
-if (!_testing_expect((t), (b) != 0, __FILE__, __LINE__)) return;
+/****************************************/
+static i32 test_runner_run(struct test_runner *tr)
+{
+	u32 i;
+	struct arena a;
+	struct timespec start, end;
+	f32 elapsed;
+	f32 elapsed_tot;
+	struct testing_t t;
 
-static int _testing_expect(
-	testing_t *t, int test, const char *file, int line
-) {
-	if (test) return 1;
-	size_t len = 0;
-	char *ptr = 0;
-	//
-	len = snprintf(0, 0, "%s:%d assertion failed", file, line);
-	assert((ptr = alloc_new(t->arena, len+1)));
-	snprintf(ptr, len+1, "%s:%d assertion failed", file, line);
-	t->message = ptr;
+	blib_memset(&a, 0, sizeof(a));
+	arena_init(&a, (usize)512 << 20);
+	blib_memset(a.base, 0, a.cap);
+	elapsed_tot = 0;
+
+	printf("###### STARTING TESTS ######\n");
+
+	for (i = 0; i < tr->t_len; i++) {
+	blib_memset(&t, 0, sizeof(t));
+		t.arena = &a;
+
+		printf("START | %s\n", (tr->tests+i)->tname);
+		clock_gettime(CLOCK_MONOTONIC, &start);
+		(tr->tests+i)->tf(&t);
+		clock_gettime(CLOCK_MONOTONIC, &end);
+		elapsed = timespec_interval(start, end);
+		elapsed_tot += elapsed;
+		printf("\rPASS | %s	| %.3fms	| mem: %ld\n",
+		       (tr->tests+i)->tname, elapsed, a.len);
+		arena_free_all(&a);
+	}
+
+	printf("%ld tests executed in %.3fms\n", tr->t_len, elapsed_tot);
+	printf("############################\n");
+
+	arena_deinit(&a);
 	return 0;
 }
 
-static void testing_run(TestRunner *tr) {
-	testing_t t = {0};
-	Test test = {0};
-	Allocator heap = {0};
-#ifdef BLIB_DEBUG
-	HeapAllocatorReport report = {0};
-#endif
-	//
-	for (size_t i = 0; i < slice_len(&tr->test_procedures); i++) {
-		t = (testing_t){0};
-#ifdef BLIB_DEBUG
-		report = (HeapAllocatorReport){0};
-#endif
-		assert(!heap_allocator_init(&heap, &tr->arena));
-		t = (testing_t){.heap = &heap, .arena = &tr->arena};
-		slice_get(&tr->test_procedures, i, &test);
-		// run the test
-		test.proc(&t);
-		//
-		if (t.message) {
-			printf("%s FAIL: %s\n", test.name, t.message);
-			goto finalizer;
-		} 
-		if (t.failed) {
-			printf("%s FAIL\n", test.name);
-			goto finalizer;
-		} 
-#ifdef BLIB_DEBUG
-		assert(!heap_allocator_get_report(&heap, &report));
-		if (report.n_leaks) {
-			printf("%s PASS but has memory leaks\n", test.name);
-			heap_allocator_report_print(&report);
-			goto finalizer;
-		}
-#endif
-		printf("%s PASS\n", test.name);
-finalizer:
-		alloc_free_all(&tr->arena);
-	}
-}
+#endif /* TESTING_H */
 
-#endif // TESTING_H
